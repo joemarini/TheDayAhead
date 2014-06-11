@@ -9,9 +9,7 @@ The `deliverNews()` function in the script is the main entry point. This script 
 > *Note*: to use the script you must enable the Calendar API in both your Apps Script IDE and in the Google Developer console. There is a link to the developer console in the dialog that enables the Calendar API  in the Apps Script editor. Select Resources -> Advanced Services, then enable Calendar.
 
 ## APIs Used
-* UrlFetchApp
-* XmlService
-* GmailApp
-* Calendar
-
-
+* [UrlFetchApp] (https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app)
+* [XmlService] (https://developers.google.com/apps-script/reference/xml-service/xml-service)
+* [GmailApp] (https://developers.google.com/apps-script/reference/gmail/gmail-app)
+* [Calendar] (https://developers.google.com/apps-script/reference/calendar/)
