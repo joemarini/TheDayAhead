@@ -31,7 +31,7 @@ var topStories = [];
 
 // Settings
 var HEADLINE_LIMIT = 15;                    // Number of headlines per news source
-var EMAIL_TITLE = "The Day Ahead";          // What to title the email
+var EMAIL_TITLE = "Top News and Events";          // What to title the email
 var DAYS_AHEAD = 7;                         // Number of days out to scan events
 
 /*******
