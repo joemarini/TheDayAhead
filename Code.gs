@@ -1,7 +1,7 @@
 /*******
 ** TheDayAhead Google Apps Script
 **
-** Crawls a list of given RSS feeds and returns a set of headlines, which
+** Crawls a list of given RSS feeds and returns a set of headlines, which 
 ** are sent via Gmail to the given email address along with information from
 ** the user's calendar on events for the day and events that have not been
 ** responded to yet.
@@ -18,11 +18,13 @@ var dataSources = [
   "http://feeds2.feedburner.com/thenextweb",
   "http://feeds.arstechnica.com/arstechnica/index?format=xml",
   "http://www.forbes.com/technology/feed/",
-  "http://www.pcworld.com/index.rss"
+  "http://www.pcworld.com/index.rss",
+  "http://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+  "http://recode.net/feed/"
 ];
 // keyword triggers
 var keyWords = [
-  "chrome", "chromebook", "chromeos", "google", "android", "gmail", "cloud", "app engine",
+  "chrome", "chromebook", "chromeos", "google", "android", "gmail", "cloud", "app engine", 
   "appengine", "compute engine", "microsoft", "facebook", "apple", "windows phone", "windows 8"
 ];
 
@@ -31,7 +33,7 @@ var topStories = [];
 
 // Settings
 var HEADLINE_LIMIT = 15;                    // Number of headlines per news source
-var EMAIL_TITLE = "Top News and Events";          // What to title the email
+var EMAIL_TITLE = "Top News And Events";    // What to title the email
 var DAYS_AHEAD = 7;                         // Number of days out to scan events
 
 /*******
@@ -45,22 +47,22 @@ function deliverNews()
   var newsMsg = ""; // will hold the completed HTML to email
   var deliverAddress = Session.getActiveUser().getEmail();
   
-  var calEventsStr = "<h2>Calendar</h2>";
+  var calEventsStr = "<h2>Calendar: ";
 
   // get a list of today's events
   var calEvents = getEventsForToday();
   if (calEvents.length > 0) {
-    calEventsStr += "<p>You have " + calEvents.length + " events today</p>";
+    calEventsStr += calEvents.length + " Events</h2>";
     calEventsStr += buildEventsHTML(calEvents);
   }
   else {
-    calEventsStr += "<p>No events today</p>";
+    calEventsStr += "0 Events</h2>";
   }
   
   // Get upcoming calendar events that have not been responded to
   calEvents = getEventsMissingResponse();
   if (calEvents.length > 0) {
-    calEventsStr += "<p>You have " + calEvents.length + " events in the next " +
+    calEventsStr += "<p>You have " + calEvents.length + " events in the next " + 
       DAYS_AHEAD + " days that you have not RSVP'd to:</p>";
 
     calEventsStr += buildEventsHTML(calEvents);
@@ -77,7 +79,7 @@ function deliverNews()
   if (topStories.length > 0) {
     topStoriesStr += "<ul>";
     for (var k=0; k<topStories.length; k++) {
-      topStoriesStr += "<li style='font-weight:bold'><a href='" + topStories[k].link + "'>" +
+      topStoriesStr += "<li style='font-weight:bold'><a href='" + topStories[k].link + "'>" + 
         topStories[k].title + "</a></li>\n";
     }
     topStoriesStr += "</ul>";
@@ -100,7 +102,7 @@ function deliverNews()
 ** @returns {string} Formatted HTML of the feed headlines
 */
 function retrieveFeedItems(feedUrl) {
-  var feedSrc = UrlFetchApp.fetch(feedUrl).getContentText();
+  var feedSrc = null;
   var feedDoc = null;
   var str = "";
   var itemCount = 0;
@@ -110,6 +112,7 @@ function retrieveFeedItems(feedUrl) {
   // to avoid having one bad XML feed take down the entire script,
   // wrap the parsing in a try-catch block
   try {
+    feedSrc = UrlFetchApp.fetch(feedUrl).getContentText();
     feedDoc = XmlService.parse(feedSrc);
     if (feedDoc)
       root = feedDoc.getRootElement();
@@ -200,12 +203,13 @@ function getEventsMissingResponse() {
 /*******
 ** getEventsForToday
 **
-** retrieves the Calendar events for today.
+** retrieves the Calendar events for today. 
 **
 ** @returns {Event []} list of Calendar Events
 */
 function getEventsForToday() {
-  var returnEvents = null;
+  var returnEvents = [];
+  var calendars, pageToken;
   
   // set the lower bound at midnight
   var today1 = new Date();
@@ -219,29 +223,46 @@ function getEventsForToday() {
   var ds1 = today1.toISOString();
   var ds2 = today2.toISOString();
 
-  var result = Calendar.Events.list("primary", {singleEvents: true, timeMin: ds1, timeMax: ds2});
+  // loop through all Calendars to get events
+  do {
+    calendars = Calendar.CalendarList.list({
+      maxResults: 100,
+      pageToken: pageToken
+    });
+    if (calendars.items && calendars.items.length > 0) {
+      for (var i = 0; i < calendars.items.length; i++) {
+        var calendar = calendars.items[i];
+        var tempResult = Calendar.Events.list(calendar.id, {singleEvents: true, timeMin: ds1, timeMax: ds2});
+        returnEvents = returnEvents.concat(tempResult.items);
+      }
+    } 
+    else {
+      Logger.log('No calendars found.');
+    }
+    pageToken = calendars.nextPageToken;
+  } while (pageToken);
+  
   // Get the events
-  returnEvents = result.items;
   return returnEvents;
 }
 
 /*******
 ** buildEventsHTML
 **
-** given a set of calendar events, build an HTML list.
+** given a set of calendar events, build an HTML list. 
 **
 ** @returns {string} string of HTML representing the events
 */
 function buildEventsHTML(calEvents) {
   var str="";
 
-  str += "<ul>";
+  str += "<ul>";    
   for (var i=0; i < calEvents.length; i++) {
     // Gotcha! All-day events don't have a dateTime, just a date, so need to check
-    var dateStr = convertDate(calEvents[i].start.dateTime ?
-                              calEvents[i].start.dateTime :
+    var dateStr = convertDate(calEvents[i].start.dateTime ? 
+                              calEvents[i].start.dateTime : 
                               calEvents[i].start.date).toLocaleString();
-    str += "<li><a href='" + calEvents[i].htmlLink + "'>" +
+    str += "<li><a href='" + calEvents[i].htmlLink + "'>" + 
       calEvents[i].summary + "</a> " + dateStr + "</li>";
   }
   str += "</ul>";
@@ -261,7 +282,7 @@ function convertDate(tStr) {
   var dateTimeRE = /(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)([+\-]\d+):(\d+)/;
   var dateRE = /(\d+)-(\d+)-(\d+)/;
   var match = tStr.match(dateTimeRE);
-  if (!match)
+  if (!match) 
     match = tStr.match(dateRE);
   
   var nums = [];
