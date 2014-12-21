@@ -20,16 +20,43 @@ var dataSources = [
   "http://www.forbes.com/technology/feed/",
   "http://www.pcworld.com/index.rss",
   "http://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
-  "http://recode.net/feed/"
-];
-// keyword triggers
-var keyWords = [
-  "chrome", "chromebook", "chromeos", "google", "android", "gmail", "cloud", "app engine", 
-  "appengine", "compute engine", "microsoft", "facebook", "apple", "windows phone", "windows 8"
+  "http://recode.net/feed/",
+  "http://omgchrome.com/feed"
 ];
 
-// List to hold headlines that contain keywords
-var topStories = [];
+// categories and keywords to look for news in. each stories array gets filled in
+var categories = [
+  {
+    "name": "Google",
+    "keywords": ["google","chrome","android","gmail","compute engine","app engine","appengine"],
+    "stories": []
+  },
+  {
+    "name": "Microsoft",
+    "keywords" : ["microsoft","windows","azure","typescript","bing","surface pro"],
+    "stories": []
+  },
+  {
+    "name": "Apple",
+    "keywords" : ["ios","ipad","siri","iphone"],
+    "stories": []
+  },
+  {
+    "name": "Amazon",
+    "keywords" : ["amazon"],
+    "stories": []
+  },
+  {
+    "name": "Twitter",
+    "keywords" : ["twitter"],
+    "stories": []
+  },
+  {
+    "name": "Facebook",
+    "keywords" : ["facebook"],
+    "stories": []
+  }  
+];
 
 // Settings
 var HEADLINE_LIMIT = 15;                    // Number of headlines per news source
@@ -47,6 +74,66 @@ function deliverNews()
   var newsMsg = ""; // will hold the completed HTML to email
   var deliverAddress = Session.getActiveUser().getEmail();
   
+  var calEventsStr = buildCalendarEventsHTML();
+  
+  // Collect the headlines from the feeds and filter the top stories
+  var feedStoriesStr = "";
+  for (var i=0; i < dataSources.length; i++) {
+    feedStoriesStr += retrieveFeedItems(dataSources[i]);
+  }
+  
+  // Generate the Top Stories list that was created based on keywords
+  var topStoriesStr = "<h2>Top Stories</h2>";
+  topStoriesStr += categorizedNews();
+
+  // put all the data together
+  newsMsg = "<h1>" + EMAIL_TITLE + "</h1>\n" + calEventsStr + topStoriesStr + feedStoriesStr;
+  
+  // Deliver the email message as HTML to the recipient
+  GmailApp.sendEmail(deliverAddress, EMAIL_TITLE, "", { htmlBody: newsMsg });
+  Logger.log(newsMsg.length);
+}
+
+/*******
+** categorizedNews
+**
+** Loops over the generated list of stories in the categories array and
+** builds a table of news items arranged by category
+**
+** @returns {string} formatted HTML of categorized news as a table
+*/
+function categorizedNews() {
+  var resultHTML = "";
+
+  // build the table that will hold the categorized results  
+  resultHTML += "<table style='border: 1px solid gray;border-spacing:0'><tbody>";
+
+  // loop over each category and look for keywords
+  for (var i=0; i<categories.length; i++) {
+    var item = categories[i];
+    // only add a section for the category if it contains any stories
+    if (item.stories.length > 0) {
+      resultHTML += "<tr><td style='font-size:large;background-color:#ddd;border-bottom: 1px solid gray;border-top: 1px solid gray;padding:2pt'>" + item.name + "</td>";
+      
+      for (var j=0; j < item.stories.length; j++) {
+        resultHTML += "<tr><td style='padding:2pt'>";
+        resultHTML += "<a href='" + item.stories[j].link + "'>" + item.stories[j].title + "</a>";
+        resultHTML += "</td></tr>";
+      }
+      
+      resultHTML += "</tr>";
+    }
+  }
+  resultHTML += "</tbody></table>";
+  return resultHTML;
+}
+
+/*******
+** buildCalendarEventsHTML
+**
+** @returns {string} Formatted HTML of the calendar events
+*/
+function buildCalendarEventsHTML() {
   var calEventsStr = "<h2>Calendar: ";
 
   // get a list of today's events
@@ -68,29 +155,7 @@ function deliverNews()
     calEventsStr += buildEventsHTML(calEvents);
   }
   
-  // Collect the headlines from the feeds and filter the top stories
-  var feedStoriesStr = "";
-  for (var i=0; i < dataSources.length; i++) {
-    feedStoriesStr += retrieveFeedItems(dataSources[i]);
-  }
-  
-  // Generate the Top Stories list that was created based on keywords
-  var topStoriesStr = "<h2>Top Stories</h2>";
-  if (topStories.length > 0) {
-    topStoriesStr += "<ul>";
-    for (var k=0; k<topStories.length; k++) {
-      topStoriesStr += "<li style='font-weight:bold'><a href='" + topStories[k].link + "'>" + 
-        topStories[k].title + "</a></li>\n";
-    }
-    topStoriesStr += "</ul>";
-  }
-
-  // put all the data together
-  newsMsg = "<h1>" + EMAIL_TITLE + "</h1>\n" + calEventsStr + topStoriesStr + feedStoriesStr;
-  
-  // Deliver the email message as HTML to the recipient
-  GmailApp.sendEmail(deliverAddress, EMAIL_TITLE, "", { htmlBody: newsMsg });
-  Logger.log(newsMsg.length);
+  return calEventsStr;
 }
 
 /*******
@@ -145,15 +210,18 @@ function retrieveFeedItems(feedUrl) {
       var strTitle = items[i].getChildText("title");
       var strLink = items[i].getChildText("link");
       
-      // If the title triggers a keyword, add it to the topStories list
-      for (var j=0; j < keyWords.length; j++) {
-        // simple index search, could be vastly improved
-        if ( strTitle.toLowerCase().indexOf(keyWords[j]) != -1) {
-          topStories.push( {title: strTitle, link: strLink} );
-          keywordFound=true;
-          break;
+      for (var n=0; n < categories.length; n++) {
+        for (var m=0; m < categories[n].keywords.length; m++) {
+          // simple index search, could probably be vastly improved
+          var searchWord = categories[n].keywords[m];
+          if ( strTitle.toLowerCase().indexOf(searchWord) != -1) {
+            categories[n].stories.push( {title: strTitle, link: strLink} );
+            keywordFound=true;
+            break;
+          }
         }
       }
+      
       // If we didn't add this item to the topStories, add it to the main news
       if (!keywordFound) {
         str += "<li><a href='" + strLink + "'>" + strTitle + "</a></li>\n";
